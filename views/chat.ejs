@@ -60,7 +60,7 @@
     <div class="main h-screen w-full flex items-center justify-center bg-zinc-200">
         <div class="incomingCallReceiver absolute border-[1px] border-zinc-300 hidden  h-[10vw] w-[15vw] px-5 rounded bg-white ">
             <div class="upper h-[50%] flex items-center justify-center">
-                <h2 class="text-[1.5vw]">Incoming Calll...</h2>
+                <h2 class="text-[1.5vw]">Incoming Video Calll...</h2>
             </div>
             <div class="lower flex text-white h-[50%] justify-between p-4">
                 <div class="accept capitalize px-3 py-2 h-fit bg-green-400 rounded"> <h1>accept</h1></div>
@@ -89,11 +89,15 @@
                 <button type="submit" class="ml-[1vw] px-4 py-2 bg-blue-500 text-white rounded">Send</button>
             </form>
         </div>
-        <div class="videoScreen h-[95vh] w-full hidden bg-black  ">
+
+        <div class="videoScreen h-[100vh] w-full hidden bg-black  ">
             <video id="localVideo" class="bg-black absolute h-[10vw] w-[15vw] bottom-[5%] right-[5%]" muted playsinline autoplay></video>
             <button id="hangup" class="absolute px-3 py-2 bg-red-500 z-50 rounded-lg bottom-[7%] left-[46%]">hangup</button>
-            <video id="remoteVideo" class="bg-black w-full h-[100%]" autoplay muted playsinline></video>
+            <button id="muteButton" class="absolute px-3 py-2 bg-yellow-500 z-50 rounded-lg bottom-[7%] right-[40%]">Mute</button>
+            <video id="remoteVideo" class="bg-black w-full h-[100%]" autoplay  playsinline></video>
         </div>
+
+      
         
     </div>
     
@@ -350,6 +354,24 @@
                     inCall = false;
                 }
             }
+
+            let isMuted = false; // Mute state
+
+// Mute button functionality
+document.querySelector("#muteButton").addEventListener("click", () => {
+    if (localStream) {
+        localStream.getAudioTracks().forEach(track => {
+            track.enabled = !track.enabled; // Toggle audio track
+        });
+
+        // Toggle mute state
+        isMuted = !isMuted;
+
+        // Update button text
+        document.querySelector("#muteButton").textContent = isMuted ? "Unmute" : "Mute";
+    }
+});
+
    </script>
 </body>
 </html>
