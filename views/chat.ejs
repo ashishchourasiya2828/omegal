@@ -106,56 +106,72 @@
     <script>
         let room;
         let messagebox = document.querySelector("#messages");
+        let isJoined = false;
+        let messageFormListener = null;
+        let socketMessageListener = null;
         
-        const socket=io();
+        const socket = io();
 
 
         document.querySelector(".nameInputButton").addEventListener("click", function(e){
 
             let name= document.querySelector(".nameInput");
             
-            if(name.value.trim().length >0){
+            if(name.value.trim().length >0 && !isJoined){
+                isJoined = true;
                 
             socket.emit("join",name.value);
             document.querySelector(".nameinputdiv").classList.add("hidden");
             document.querySelector(".container").classList.remove("hidden");
 
             socket.on("joinRoom",(roomid)=>{
-                // console.log(roomid);
                 document.getElementById("koinhihai").classList.add("hidden");
-                room=roomid ;
+                room=roomid;
+                console.log(`Joined room: ${roomid}`);
                 
                
             })
 
-             document.querySelector("#messageForm").addEventListener("submit", function(e){
-                e.preventDefault();
-                let message = document.querySelector("#messageInput").value;
-                socket.emit("sendMessage",{message,room});
-                document.querySelector("#messageInput").value = "";
-             })
+             // Avoid duplicate event listeners
+             if (!messageFormListener) {
+                messageFormListener = function(e){
+                    e.preventDefault();
+                    let message = document.querySelector("#messageInput").value.trim();
+                    if (message && room) {
+                        socket.emit("sendMessage",{message,room});
+                        document.querySelector("#messageInput").value = "";
+                    }
+                };
+                document.querySelector("#messageForm").addEventListener("submit", messageFormListener);
+             }
 
-             socket.on("message",function(data){
-                let {message,id} = data;
-                // console.log(data);
-                
-                if(id===socket.id){
-                    messagebox.innerHTML +=`<div class="mb-4 flex justify-end">
+             // Avoid duplicate socket listeners
+             if (!socketMessageListener) {
+                socketMessageListener = function(data){
+                    let {message,id} = data;
+                    
+                    // Sanitize message to prevent XSS
+                    const sanitizedMessage = message.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                    
+                    if(id===socket.id){
+                        messagebox.innerHTML +=`<div class="mb-4 flex justify-end">
         <div class="bg-blue-300 px-2 py-1 rounded-lg max-w-xs">
-            <p>${message}</p>
+            <p>${sanitizedMessage}</p>
         </div>
     </div>`
-                messagebox.scrollTop = messagebox.scrollHeight;
-                }
-                else{
-                    messagebox.innerHTML +=`<div class="mb-4 flex justify-start">
+                    messagebox.scrollTop = messagebox.scrollHeight;
+                    }
+                    else{
+                        messagebox.innerHTML +=`<div class="mb-4 flex justify-start">
             <div class="bg-gray-200 px-2 py-1 rounded-lg max-w-xs">
-                <p>${message}</p>
+                <p>${sanitizedMessage}</p>
                 </div>
                 </div>`
-                messagebox.scrollTop = messagebox.scrollHeight;
-                }
-             })
+                    messagebox.scrollTop = messagebox.scrollHeight;
+                    }
+                };
+                socket.on("message", socketMessageListener);
+             }
            }
 
 
@@ -182,11 +198,12 @@
 
             document.getElementById("localVideo").srcObject = localStream;
 
-            initiateOffer();
+            await initiateOffer();
             inCall = true;
             }
         catch(err){
-            console.log("error in initialize" + err);
+            console.error("Error initializing media:", err);
+            alert("Failed to access camera/microphone. Please check permissions.");
         }
                }
 
@@ -194,20 +211,19 @@
             try{    
                 await createPeerConnection();
                 const offer = await peerConnection.createOffer();
-                    await peerConnection.setLocalDescription(offer);
-                    // console.log(offer);
-                    
-                    socket.emit("signalingMessage", {
-                        room,
-                        message: JSON.stringify({
-                            type: "offer",
-                            offer
-                        })
+                await peerConnection.setLocalDescription(offer);
+                
+                socket.emit("signalingMessage", {
+                    room,
+                    message: JSON.stringify({
+                        type: "offer",
+                        offer
                     })
+                })
 
             }
             catch(err){
-                console.log("error in initiateOffer" + err);
+                console.error("Error in initiateOffer:", err);
             }
         }
 
@@ -229,10 +245,8 @@
                 }
 
                 peerConnection.onicecandidate = (event) => {
-                    // console.log(event.candidate);
-                    
                     if (event.candidate) {
-                        console.log("Sending Ice Candidates");
+                        console.log("Sending ICE candidate");
 
                         socket.emit("signalingMessage", {
                             room,
@@ -243,7 +257,14 @@
                         })
                     }
                 }
-                 
+
+                peerConnection.onconnectionstatechange = () => {
+                    console.log("Connection state:", peerConnection.connectionState);
+                    if (peerConnection.connectionState === "failed") {
+                        console.error("Connection failed");
+                        alert("Connection failed. Please try again.");
+                    }
+                }
               
             }
     
@@ -255,10 +276,10 @@
             if(type === "candidate" && peerConnection)
         {
             try{
-                await peerConnection.addIceCandidate( candidate);
+                await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
             }
             catch(err){
-                console.log("error in handleSignalingMessage of candidate" + err);
+                console.error("Error adding ICE candidate:", err);
             }
         }
         if (type === "hangup") {
@@ -268,37 +289,30 @@
         }
 
         const handleOffer = async (offer) =>{
-            // console.log("hryyyy");
             if(!peerConnection){
                 await createPeerConnection();
             }
             try{
-                await peerConnection.setRemoteDescription( new RTCSessionDescription(offer));
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
                 const answer = await peerConnection.createAnswer();
-                // console.log(answer);
-                
-              await peerConnection.setLocalDescription(answer);
+                await peerConnection.setLocalDescription(answer);
                 
                 socket.emit("signalingMessage", { room, message: JSON.stringify({ type: "answer", answer }) });
-                    inCall = true;
+                inCall = true;
             }
             catch(err){
-                console.log("error in handleoffer"+err);
-                
+                console.error("Error in handleOffer:", err);
             }
         }
 
         const handleAnswer = async (answer) => {
                 try {
-                    // console.log(answer); 
-                    if(peerConnection.signalingState !== "stable"){
+                    if(peerConnection && peerConnection.signalingState !== "stable"){
                         await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
-
                     }
-                    
                 }
                 catch (error) {
-                    console.log("failed to handle answer");
+                    console.error("Failed to handle answer:", error);
                 }
                
             }
@@ -347,13 +361,26 @@
                 if (peerConnection) {
                     peerConnection.close();
                     peerConnection = null;
-                    localStream.getTracks().forEach(track => track.stop());
-                    document.querySelector(".container").classList.remove("hidden");
-                    document.querySelector(".videoScreen").classList.add("hidden");
-                    socket.emit("signalingMessage", { room, message: JSON.stringify({ type: "hangup" }) });
-                    inCall = false;
                 }
+                if (localStream) {
+                    localStream.getTracks().forEach(track => track.stop());
+                    localStream = null;
+                }
+                document.querySelector(".container").classList.remove("hidden");
+                document.querySelector(".videoScreen").classList.add("hidden");
+                
+                if (room) {
+                    socket.emit("signalingMessage", { room, message: JSON.stringify({ type: "hangup" }) });
+                    socket.emit("leaveRoom");
+                }
+                inCall = false;
             }
+
+            // Handle when other user leaves
+            socket.on("userLeft", () => {
+                alert("Other user has left the chat");
+                hangup();
+            });
 
             let isMuted = false; // Mute state
 

@@ -1,0 +1,1252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - WhatsApp Clone</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        .video-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 1000;
+        }
+        .video-modal.active {
+            display: flex;
+        }
+        
+        /* Mobile responsive styles */
+        @media (max-width: 768px) {
+            .mobile-hide {
+                display: none !important;
+            }
+            .mobile-show {
+                display: flex !important;
+            }
+            #localVideo {
+                width: 120px !important;
+                height: 90px !important;
+                bottom: 80px !important;
+                right: 8px !important;
+            }
+            .video-controls {
+                bottom: 16px !important;
+                gap: 8px !important;
+            }
+            .video-controls button {
+                padding: 12px !important;
+            }
+            .video-controls svg {
+                width: 20px !important;
+                height: 20px !important;
+            }
+            .calling-overlay-avatar,
+            .incoming-overlay-avatar {
+                width: 80px !important;
+                height: 80px !important;
+                font-size: 2rem !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 h-screen overflow-hidden">
+    <div class="flex h-screen">
+        <!-- Left Sidebar - Conversations List -->
+        <div id="conversationsSidebar" class="w-full md:w-1/3 bg-white border-r border-gray-200 flex flex-col">
+            <!-- Header -->
+            <div class="bg-teal-600 text-white p-4 flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-teal-700 rounded-full flex items-center justify-center font-bold">
+                        <%= user.name.charAt(0).toUpperCase() %>
+                    </div>
+                    <div>
+                        <h2 class="font-semibold"><%= user.name %></h2>
+                        <p class="text-xs text-teal-100"><%= user.email %></p>
+                    </div>
+                </div>
+                <div class="flex space-x-2">
+                    <button id="searchUsersBtn" class="p-2 hover:bg-teal-700 rounded-full transition">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                    </button>
+                    <a href="/logout" class="p-2 hover:bg-teal-700 rounded-full transition">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                        </svg>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Search Bar -->
+            <div id="searchSection" class="hidden p-3 bg-gray-50 border-b">
+                <div class="flex items-center space-x-2">
+                    <input 
+                        type="text" 
+                        id="searchInput" 
+                        placeholder="Search users by name or email..." 
+                        class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none"
+                    >
+                    <button id="closeSearchBtn" class="p-2 text-gray-600 hover:text-gray-800">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+                <div id="searchResults" class="mt-2 max-h-60 overflow-y-auto space-y-1"></div>
+            </div>
+
+            <!-- Conversations List -->
+            <div id="conversationsList" class="flex-1 overflow-y-auto scrollbar-hide">
+                <% if (conversations.length === 0) { %>
+                    <div class="p-8 text-center text-gray-500">
+                        <svg class="w-16 h-16 mx-auto mb-4 text-gray-300" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>
+                        </svg>
+                        <p class="font-medium">No conversations yet</p>
+                        <p class="text-sm mt-2">Click the search icon to find users and start chatting</p>
+                    </div>
+                <% } else { %>
+                    <% conversations.forEach(conv => { %>
+                        <div class="conversation-item border-b border-gray-100 p-4 hover:bg-gray-50 cursor-pointer transition" 
+                             data-conversation-id="<%= conv.id %>"
+                             data-other-user-id="<%= conv.otherUser.id %>"
+                             data-other-user-name="<%= conv.otherUser.name %>">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-12 h-12 bg-teal-500 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0">
+                                    <%= conv.otherUser.name.charAt(0).toUpperCase() %>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex justify-between items-start">
+                                        <h3 class="font-semibold text-gray-900 truncate"><%= conv.otherUser.name %></h3>
+                                        <% if (conv.lastMessage) { %>
+                                            <span class="text-xs text-gray-500">
+                                                <%= new Date(conv.lastMessage.createdAt).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}) %>
+                                            </span>
+                                        <% } %>
+                                    </div>
+                                    <% if (conv.lastMessage) { %>
+                                        <p class="text-sm text-gray-600 truncate">
+                                            <% if (conv.lastMessage.senderId === user.id) { %>
+                                                You: 
+                                            <% } %>
+                                            <%= conv.lastMessage.content %>
+                                        </p>
+                                    <% } else { %>
+                                        <p class="text-sm text-gray-400 italic">No messages yet</p>
+                                    <% } %>
+                                </div>
+                            </div>
+                        </div>
+                    <% }) %>
+                <% } %>
+            </div>
+        </div>
+
+        <!-- Right Side - Chat Area -->
+        <div id="chatArea" class="flex-1 flex flex-col bg-gray-50 hidden md:flex">
+            <!-- Empty State -->
+            <div id="emptyState" class="flex-1 flex items-center justify-center">
+                <div class="text-center text-gray-400">
+                    <svg class="w-32 h-32 mx-auto mb-4" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/>
+                    </svg>
+                    <h3 class="text-xl font-semibold mb-2">Select a conversation</h3>
+                    <p>Choose a conversation from the left to start chatting</p>
+                </div>
+            </div>
+
+            <!-- Chat Container -->
+            <div id="chatContainer" class="hidden flex-1 flex flex-col">
+                <!-- Chat Header -->
+                <div class="bg-white border-b border-gray-200 p-3 md:p-4 flex items-center justify-between">
+                    <!-- Back button for mobile -->
+                    <button id="backToConversations" class="md:hidden p-2 -ml-2 mr-2 hover:bg-gray-100 rounded-full">
+                        <svg class="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                        </svg>
+                    </button>
+                    <div class="flex items-center space-x-3 flex-1">
+                        <div id="chatAvatar" class="w-10 h-10 bg-teal-500 rounded-full flex items-center justify-center text-white font-bold"></div>
+                        <div>
+                            <h3 id="chatName" class="font-semibold text-gray-900"></h3>
+                            <p id="chatStatus" class="text-xs text-gray-500">Online</p>
+                        </div>
+                    </div>
+                    <div class="flex space-x-2">
+                        <button id="videoCallBtn" class="p-2 text-teal-600 hover:bg-teal-50 rounded-full transition">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Messages Area -->
+                <div id="messagesContainer" class="flex-1 overflow-y-auto p-3 md:p-4 space-y-3 scrollbar-hide bg-[#efeae2]">
+                    <!-- Messages will be loaded here -->
+                </div>
+
+                <!-- Typing Indicator -->
+                <div id="typingIndicator" class="hidden px-4 py-2 text-sm text-gray-500 italic">
+                    <span id="typingUserName"></span> is typing...
+                </div>
+
+                <!-- Message Input -->
+                <div class="bg-white border-t border-gray-200 p-3 md:p-4">
+                    <form id="messageForm" class="flex items-center space-x-2 md:space-x-3">
+                        <input 
+                            type="text" 
+                            id="messageInput" 
+                            placeholder="Type a message..." 
+                            class="flex-1 px-3 md:px-4 py-2 md:py-3 text-sm md:text-base border border-gray-300 rounded-full focus:ring-2 focus:ring-teal-500 outline-none"
+                            autocomplete="off"
+                        >
+                        <button 
+                            type="submit" 
+                            class="bg-teal-500 hover:bg-teal-600 text-white p-2 md:p-3 rounded-full transition transform hover:scale-110"
+                        >
+                            <svg class="w-5  h-5 md:w-6 rotate-90 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+                            </svg>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Video Call Modal -->
+    <div id="videoModal" class="video-modal items-center justify-center">
+        <div class="relative w-full h-full">
+            <video id="remoteVideo" autoplay playsinline class="w-full h-full object-cover"></video>
+            <video id="localVideo" autoplay playsinline muted class="absolute bottom-4 right-4 w-32 h-24 md:w-48 md:h-36 object-cover rounded-lg shadow-lg border-2 border-white"></video>
+            
+            <div class="video-controls absolute bottom-6 md:bottom-8 left-1/2 transform -translate-x-1/2 flex space-x-3 md:space-x-4">
+                <button id="muteBtn" class="bg-gray-700 hover:bg-gray-600 text-white p-3 md:p-4 rounded-full transition shadow-lg">
+                    <svg class="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
+                    </svg>
+                </button>
+                <button id="videoToggleBtn" class="bg-gray-700 hover:bg-gray-600 text-white p-3 md:p-4 rounded-full transition shadow-lg">
+                    <svg class="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                    </svg>
+                </button>
+                <button id="endCallBtn" class="bg-red-600 hover:bg-red-700 text-white p-3 md:p-4 rounded-full transition shadow-lg">
+                    <svg class="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <div id="callingOverlay" class="hidden absolute inset-0 bg-gray-900 bg-opacity-90 flex flex-col items-center justify-center">
+                <div class="w-20 h-20 md:w-24 md:h-24 bg-teal-500 rounded-full flex items-center justify-center text-white text-3xl md:text-4xl font-bold mb-4">
+                    <span id="callingAvatar"></span>
+                </div>
+                <h2 id="callingName" class="text-white text-xl md:text-2xl font-semibold mb-2 px-4 text-center"></h2>
+                <p class="text-gray-300 mb-8 text-sm md:text-base">Calling...</p>
+            </div>
+
+            <div id="incomingCallOverlay" class="hidden absolute inset-0 bg-gray-900 bg-opacity-90 flex flex-col items-center justify-center">
+                <div class="w-20 h-20 md:w-24 md:h-24 bg-teal-500 rounded-full flex items-center justify-center text-white text-3xl md:text-4xl font-bold mb-4">
+                    <span id="incomingCallerAvatar"></span>
+                </div>
+                <h2 id="incomingCallerName" class="text-white text-xl md:text-2xl font-semibold mb-2 px-4 text-center"></h2>
+                <p class="text-gray-300 mb-8 text-sm md:text-base">Incoming call...</p>
+                <div class="flex space-x-4">
+                    <button id="acceptCallBtn" class="bg-green-600 hover:bg-green-700 text-white px-6 md:px-8 py-2.5 md:py-3 rounded-full transition text-sm md:text-base">
+                        Accept
+                    </button>
+                    <button id="rejectCallBtn" class="bg-red-600 hover:bg-red-700 text-white px-6 md:px-8 py-2.5 md:py-3 rounded-full transition text-sm md:text-base">
+                        Reject
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        const userId = '<%= user.id %>';
+        const userName = '<%= user.name %>';
+        
+        let currentConversationId = null;
+        let currentOtherUserId = null;
+        let currentOtherUserName = null;
+        let typingTimeout = null;
+
+        // WebRTC variables
+        let localStream = null;
+        let remoteStream = null;
+        let peerConnection = null;
+        let inCall = false;
+        let isInitiator = false;
+        let callState = 'idle'; // idle, calling, ringing, connected, ending
+        let pendingOffer = null;
+        let pendingCandidates = [];
+        let iceGatheringComplete = false;
+        let makingOffer = false;
+        let ignoreOffer = false;
+        let isSettingRemoteDescription = false;
+
+        const rtcConfiguration = {
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' },
+                { urls: 'stun:stun2.l.google.com:19302' },
+                { urls: 'stun:stun3.l.google.com:19302' },
+                { urls: 'stun:stun4.l.google.com:19302' }
+            ],
+            iceCandidatePoolSize: 10
+        };
+
+        // Back button for mobile navigation
+        document.getElementById('backToConversations').addEventListener('click', () => {
+            document.getElementById('conversationsSidebar').classList.remove('hidden');
+            document.getElementById('conversationsSidebar').classList.add('flex');
+            document.getElementById('chatArea').classList.add('hidden');
+            document.getElementById('chatArea').classList.remove('flex');
+        });
+
+        // Add video element event listeners for debugging
+        document.getElementById('remoteVideo').addEventListener('loadedmetadata', () => {
+            console.log('Remote video metadata loaded');
+        });
+        
+        document.getElementById('remoteVideo').addEventListener('play', () => {
+            console.log('Remote video started playing');
+        });
+        
+        document.getElementById('localVideo').addEventListener('loadedmetadata', () => {
+            console.log('Local video metadata loaded');
+        });
+
+        // Authenticate socket connection immediately
+        socket.on('connect', () => {
+            console.log('Socket connected:', socket.id);
+            socket.emit('authenticate', userId);
+        });
+
+        // Handle reconnection
+        socket.on('disconnect', () => {
+            console.log('Socket disconnected');
+        });
+
+        // Search Users
+        document.getElementById('searchUsersBtn').addEventListener('click', () => {
+            document.getElementById('searchSection').classList.remove('hidden');
+            document.getElementById('searchInput').focus();
+        });
+
+        document.getElementById('closeSearchBtn').addEventListener('click', () => {
+            document.getElementById('searchSection').classList.add('hidden');
+            document.getElementById('searchInput').value = '';
+            document.getElementById('searchResults').innerHTML = '';
+        });
+
+        let searchTimeout;
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            clearTimeout(searchTimeout);
+            const query = e.target.value.trim();
+            
+            if (query.length < 2) {
+                document.getElementById('searchResults').innerHTML = '';
+                return;
+            }
+
+            searchTimeout = setTimeout(async () => {
+                try {
+                    const response = await fetch(`/api/users/search?query=${encodeURIComponent(query)}`);
+                    const data = await response.json();
+                    
+                    const resultsDiv = document.getElementById('searchResults');
+                    if (data.users.length === 0) {
+                        resultsDiv.innerHTML = '<p class="text-sm text-gray-500 p-2">No users found</p>';
+                        return;
+                    }
+
+                    resultsDiv.innerHTML = data.users.map(user => `
+                        <div class="flex items-center space-x-3 p-3 hover:bg-gray-100 rounded-lg cursor-pointer transition user-search-result"
+                             data-user-id="${user.id}"
+                             data-user-name="${user.name}">
+                            <div class="w-10 h-10 bg-teal-500 rounded-full flex items-center justify-center text-white font-bold">
+                                ${user.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div class="flex-1">
+                                <p class="font-semibold text-sm">${user.name}</p>
+                                <p class="text-xs text-gray-500">${user.email}</p>
+                            </div>
+                        </div>
+                    `).join('');
+
+                    // Add click handlers to search results
+                    document.querySelectorAll('.user-search-result').forEach(el => {
+                        el.addEventListener('click', async () => {
+                            const otherUserId = el.dataset.userId;
+                            const otherUserName = el.dataset.userName;
+
+                            try {
+                                const response = await fetch('/api/conversations', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ otherUserId })
+                                });
+                                const data = await response.json();
+                                
+                                // Close search
+                                document.getElementById('searchSection').classList.add('hidden');
+                                document.getElementById('searchInput').value = '';
+                                document.getElementById('searchResults').innerHTML = '';
+
+                                // Open conversation
+                                openConversation(data.conversation.id, otherUserId, otherUserName);
+                                
+                                // Reload page to update conversations list
+                                setTimeout(() => location.reload(), 100);
+                            } catch (error) {
+                                console.error('Error creating conversation:', error);
+                            }
+                        });
+                    });
+                } catch (error) {
+                    console.error('Error searching users:', error);
+                }
+            }, 300);
+        });
+
+        // Open Conversation
+        document.querySelectorAll('.conversation-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const conversationId = item.dataset.conversationId;
+                const otherUserId = item.dataset.otherUserId;
+                const otherUserName = item.dataset.otherUserName;
+                
+                openConversation(conversationId, otherUserId, otherUserName);
+            });
+        });
+
+        async function openConversation(conversationId, otherUserId, otherUserName) {
+            currentConversationId = conversationId;
+            currentOtherUserId = otherUserId;
+            currentOtherUserName = otherUserName;
+
+            // Update UI
+            document.getElementById('emptyState').classList.add('hidden');
+            document.getElementById('chatContainer').classList.remove('hidden');
+            document.getElementById('chatName').textContent = otherUserName;
+            document.getElementById('chatAvatar').textContent = otherUserName.charAt(0).toUpperCase();
+
+            // Mobile: hide sidebar, show chat
+            if (window.innerWidth < 768) {
+                document.getElementById('conversationsSidebar').classList.add('hidden');
+                document.getElementById('conversationsSidebar').classList.remove('flex');
+                document.getElementById('chatArea').classList.remove('hidden');
+                document.getElementById('chatArea').classList.add('flex');
+            }
+
+            // Mark active conversation
+            document.querySelectorAll('.conversation-item').forEach(el => {
+                el.classList.remove('bg-gray-100');
+            });
+            document.querySelector(`[data-conversation-id="${conversationId}"]`)?.classList.add('bg-gray-100');
+
+            // Load messages
+            try {
+                const response = await fetch(`/api/conversations/${conversationId}/messages`);
+                const data = await response.json();
+                displayMessages(data.messages);
+
+                // Mark messages as read
+                socket.emit('markAsRead', { conversationId, userId });
+            } catch (error) {
+                console.error('Error loading messages:', error);
+            }
+        }
+
+        function displayMessages(messages) {
+            const container = document.getElementById('messagesContainer');
+            container.innerHTML = messages.map(msg => {
+                const isOwn = msg.senderId === userId;
+                return `
+                    <div class="flex ${isOwn ? 'justify-end' : 'justify-start'}">
+                        <div class="max-w-xs lg:max-w-md ${isOwn ? 'bg-teal-500 text-white' : 'bg-white text-gray-900'} rounded-lg px-4 py-2 shadow">
+                            ${!isOwn ? `<p class="text-xs font-semibold mb-1">${escapeHtml(msg.sender.name)}</p>` : ''}
+                            <p class="break-words">${escapeHtml(msg.content)}</p>
+                            <p class="text-xs ${isOwn ? 'text-teal-100' : 'text-gray-500'} mt-1 text-right">
+                                ${new Date(msg.createdAt).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}
+                            </p>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Send Message
+        document.getElementById('messageForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const input = document.getElementById('messageInput');
+            const content = input.value.trim();
+
+            if (!content || !currentConversationId) {
+                console.log('Cannot send: content or conversationId missing');
+                return;
+            }
+
+            console.log('Sending message:', {
+                conversationId: currentConversationId,
+                content,
+                senderId: userId
+            });
+
+            socket.emit('sendMessage', {
+                conversationId: currentConversationId,
+                content,
+                senderId: userId
+            });
+
+            input.value = '';
+        });
+
+        // Typing Indicator
+        document.getElementById('messageInput').addEventListener('input', () => {
+            if (!currentConversationId) return;
+
+            socket.emit('typing', {
+                conversationId: currentConversationId,
+                userId,
+                isTyping: true
+            });
+
+            clearTimeout(typingTimeout);
+            typingTimeout = setTimeout(() => {
+                socket.emit('typing', {
+                    conversationId: currentConversationId,
+                    userId,
+                    isTyping: false
+                });
+            }, 1000);
+        });
+
+        // Socket Events
+        socket.on('receiveMessage', (data) => {
+            console.log('Message received:', data);
+            console.log('Current conversation:', currentConversationId);
+            
+            if (data.conversationId === currentConversationId) {
+                const container = document.getElementById('messagesContainer');
+                const msg = data.message;
+                const isOwn = msg.senderId === userId;
+                
+                console.log('Adding message to UI:', msg.content);
+                
+                container.innerHTML += `
+                    <div class="flex ${isOwn ? 'justify-end' : 'justify-start'}">
+                        <div class="max-w-xs lg:max-w-md ${isOwn ? 'bg-teal-500 text-white' : 'bg-white text-gray-900'} rounded-lg px-4 py-2 shadow">
+                            ${!isOwn ? `<p class="text-xs font-semibold mb-1">${escapeHtml(msg.sender.name)}</p>` : ''}
+                            <p class="break-words">${escapeHtml(msg.content)}</p>
+                            <p class="text-xs ${isOwn ? 'text-teal-100' : 'text-gray-500'} mt-1 text-right">
+                                ${new Date(msg.createdAt).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}
+                            </p>
+                        </div>
+                    </div>
+                `;
+                container.scrollTop = container.scrollHeight;
+
+                // Mark as read if in current conversation
+                socket.emit('markAsRead', { conversationId: currentConversationId, userId });
+            } else {
+                console.log('Message is for a different conversation, ignoring');
+            }
+        });
+
+        socket.on('userTyping', (data) => {
+            if (data.conversationId === currentConversationId) {
+                const indicator = document.getElementById('typingIndicator');
+                if (data.isTyping) {
+                    document.getElementById('typingUserName').textContent = currentOtherUserName;
+                    indicator.classList.remove('hidden');
+                } else {
+                    indicator.classList.add('hidden');
+                }
+            }
+        });
+
+        // Video Call Functionality
+        document.getElementById('videoCallBtn').addEventListener('click', startCall);
+        document.getElementById('endCallBtn').addEventListener('click', endCall);
+        document.getElementById('acceptCallBtn').addEventListener('click', acceptCall);
+        document.getElementById('rejectCallBtn').addEventListener('click', rejectCall);
+
+        async function startCall() {
+            if (!currentConversationId) {
+                alert('Please select a conversation first');
+                return;
+            }
+            
+            if (callState !== 'idle') {
+                console.warn('⚠️ Call already in progress');
+                return;
+            }
+            
+            console.log('🔵 [CALLER] Starting call to', currentOtherUserName);
+            
+            isInitiator = true;
+            callState = 'calling';
+            
+            // Show video modal with calling overlay
+            document.getElementById('videoModal').classList.add('active');
+            document.getElementById('callingOverlay').classList.remove('hidden');
+            document.getElementById('callingName').textContent = currentOtherUserName;
+            document.getElementById('callingAvatar').textContent = currentOtherUserName.charAt(0).toUpperCase();
+
+            try {
+                console.log('🔵 [CALLER] Initializing media...');
+                await initializeMedia();
+                
+                console.log('🔵 [CALLER] Sending call invitation');
+                socket.emit('startVideoCall', {
+                    conversationId: currentConversationId,
+                    callerId: userId,
+                    callerName: userName
+                });
+                
+                console.log('✅ [CALLER] Call initiated successfully');
+                
+            } catch (error) {
+                console.error('❌ [CALLER] Failed to start call:', error);
+                endCall();
+            }
+        }
+
+        async function acceptCall() {
+            console.log('🟢 [RECEIVER] ===== ACCEPTING CALL =====');
+            console.log('🟢 [RECEIVER] pendingOffer exists:', !!pendingOffer);
+            console.log('🟢 [RECEIVER] pendingCandidates count:', pendingCandidates.length);
+            
+            document.getElementById('incomingCallOverlay').classList.add('hidden');
+            callState = 'ringing';
+            
+            try {
+                // Get user media first
+                console.log('🟢 [RECEIVER] Step 1: Getting user media...');
+                await initializeMedia();
+                console.log('🟢 [RECEIVER] Step 2: Media initialized, peer connection created');
+                
+                // Notify caller
+                console.log('🟢 [RECEIVER] Step 3: Notifying caller of acceptance');
+                socket.emit('acceptCall', { conversationId: currentConversationId });
+
+                // Wait for offer if not received yet
+                if (!pendingOffer) {
+                    console.log('🟢 [RECEIVER] Step 4: Waiting for offer to arrive...');
+                    let offerWaitCount = 0;
+                    while (!pendingOffer && offerWaitCount < 50) { // Wait up to 5 seconds
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                        offerWaitCount++;
+                    }
+                    
+                    if (!pendingOffer) {
+                        throw new Error('Timeout waiting for offer');
+                    }
+                    console.log('🟢 [RECEIVER] Offer received after waiting');
+                }
+                
+                // Process pending offer
+                console.log('🟢 [RECEIVER] Step 5: Processing pending offer');
+                console.log('🟢 [RECEIVER] Offer SDP type:', pendingOffer.type);
+                
+                isSettingRemoteDescription = true;
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(pendingOffer));
+                isSettingRemoteDescription = false;
+                console.log('🟢 [RECEIVER] Step 6: Remote description set successfully');
+                console.log('🟢 [RECEIVER] Signaling state:', peerConnection.signalingState);
+                
+                console.log('🟢 [RECEIVER] Step 7: Creating answer...');
+                const answer = await peerConnection.createAnswer({
+                    offerToReceiveAudio: true,
+                    offerToReceiveVideo: true
+                });
+                console.log('🟢 [RECEIVER] Answer created:', answer.type);
+                
+                await peerConnection.setLocalDescription(answer);
+                console.log('🟢 [RECEIVER] Step 8: Local description set');
+                
+                console.log('🟢 [RECEIVER] Step 9: Sending answer to CALLER');
+                socket.emit('signalingMessage', {
+                    conversationId: currentConversationId,
+                    message: { type: 'answer', answer: peerConnection.localDescription }
+                });
+                console.log('✅ [RECEIVER] Answer sent successfully!');
+                
+                pendingOffer = null;
+                
+                // Process queued ICE candidates
+                console.log(`🟢 [RECEIVER] Step 10: Processing ${pendingCandidates.length} queued candidates`);
+                for (const candidate of pendingCandidates) {
+                    try {
+                        await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+                        console.log('✅ [RECEIVER] Added queued candidate');
+                    } catch (err) {
+                        if (err.name !== 'OperationError') {
+                            console.warn('⚠️ Candidate error:', err.message);
+                        }
+                    }
+                }
+                pendingCandidates = [];
+                console.log('✅ [RECEIVER] Call setup complete, waiting for tracks...');
+            } catch (error) {
+                console.error('❌ [RECEIVER] Accept error:', error);
+                alert('Failed to accept call: ' + error.message);
+                endCall();
+            }
+        }
+
+        function rejectCall() {
+            console.log('🔴 [RECEIVER] User clicked Reject');
+            socket.emit('rejectCall', {
+                conversationId: currentConversationId
+            });
+            document.getElementById('videoModal').classList.remove('active');
+            document.getElementById('incomingCallOverlay').classList.add('hidden');
+            
+            // Clear pending offer and candidates
+            pendingOffer = null;
+            pendingCandidates = [];
+            currentConversationId = null;
+            currentOtherUserId = null;
+            currentOtherUserName = null;
+            console.log('🔴 [RECEIVER] Call rejected and cleaned up');
+        }
+
+        async function createPeerConnection() {
+            const role = isInitiator ? '[CALLER]' : '[RECEIVER]';
+            console.log(`📡 ${role} Creating peer connection with advanced config`);
+            
+            // Close existing connection if any
+            if (peerConnection) {
+                console.log(`📡 ${role} Closing existing peer connection`);
+                peerConnection.close();
+            }
+            
+            peerConnection = new RTCPeerConnection(rtcConfiguration);
+            iceGatheringComplete = false;
+            
+            // Add local tracks if they exist
+            if (localStream) {
+                console.log(`📡 ${role} Adding ${localStream.getTracks().length} local tracks to peer connection`);
+                localStream.getTracks().forEach(track => {
+                    console.log(`📡 ${role} Adding local track: ${track.kind}, enabled: ${track.enabled}`);
+                    peerConnection.addTrack(track, localStream);
+                });
+            } else {
+                console.warn(`⚠️ ${role} No local stream available when creating peer connection!`);
+            }
+
+            // Handle incoming remote tracks
+            peerConnection.ontrack = (event) => {
+                console.log(`📥 ${role} Track received: ${event.track.kind}`);
+                
+                // Get or create remote stream
+                if (!remoteStream) {
+                    remoteStream = new MediaStream();
+                    document.getElementById('remoteVideo').srcObject = remoteStream;
+                    console.log(`📥 ${role} Created new remote stream`);
+                }
+                
+                // Add track if not already present
+                const existingTrack = remoteStream.getTracks().find(t => t.id === event.track.id);
+                if (!existingTrack) {
+                    remoteStream.addTrack(event.track);
+                    console.log(`📥 ${role} Added ${event.track.kind} track to remote stream`);
+                }
+                
+                // Update call state
+                if (callState !== 'connected') {
+                    callState = 'connected';
+                    document.getElementById('callingOverlay').classList.add('hidden');
+                    document.getElementById('incomingCallOverlay').classList.add('hidden');
+                    console.log(`✅ ${role} Call connected!`);
+                }
+                
+                // Ensure video plays
+                const remoteVideo = document.getElementById('remoteVideo');
+                remoteVideo.play().catch(err => console.warn('Play error:', err.message));
+            };
+
+            // Handle ICE candidates - trickle ICE
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate) {
+                    console.log(`🧊 ${role} New ICE candidate: ${event.candidate.type}`);
+                    socket.emit('signalingMessage', {
+                        conversationId: currentConversationId,
+                        message: { type: 'candidate', candidate: event.candidate }
+                    });
+                } else {
+                    iceGatheringComplete = true;
+                    console.log(`🧊 ${role} ICE gathering complete`);
+                }
+            };
+            
+            // Handle ICE gathering state
+            peerConnection.onicegatheringstatechange = () => {
+                console.log(`🧊 ${role} ICE gathering state: ${peerConnection.iceGatheringState}`);
+            };
+
+            // Monitor connection state
+            peerConnection.onconnectionstatechange = () => {
+                console.log(`🔗 ${role} Connection: ${peerConnection.connectionState}`);
+                
+                switch (peerConnection.connectionState) {
+                    case 'connected':
+                        callState = 'connected';
+                        console.log(`✅ ${role} Peer connection established`);
+                        break;
+                    case 'disconnected':
+                        console.warn(`⚠️ ${role} Peer disconnected - attempting reconnection...`);
+                        break;
+                    case 'failed':
+                        console.error(`❌ ${role} Connection failed`);
+                        callState = 'ending';
+                        setTimeout(() => {
+                            if (callState === 'ending') {
+                                alert('Connection failed. Please try again.');
+                                endCall();
+                            }
+                        }, 3000);
+                        break;
+                    case 'closed':
+                        console.log(`🔗 ${role} Connection closed`);
+                        break;
+                }
+            };
+            
+            // Monitor ICE connection state
+            peerConnection.oniceconnectionstatechange = () => {
+                console.log(`🧊 ${role} ICE: ${peerConnection.iceConnectionState}`);
+                
+                if (peerConnection.iceConnectionState === 'failed') {
+                    console.warn(`⚠️ ${role} ICE failed - restarting ICE...`);
+                    peerConnection.restartIce();
+                }
+            };
+            
+            // Handle negotiation needed
+            peerConnection.onnegotiationneeded = async () => {
+                try {
+                    console.log(`🔄 ${role} Negotiation needed`);
+                    if (isInitiator && !makingOffer) {
+                        makingOffer = true;
+                        await peerConnection.setLocalDescription();
+                        socket.emit('signalingMessage', {
+                            conversationId: currentConversationId,
+                            message: { 
+                                type: 'offer', 
+                                offer: peerConnection.localDescription 
+                            }
+                        });
+                        console.log(`📤 ${role} Offer sent`);
+                        makingOffer = false;
+                    }
+                } catch (err) {
+                    console.error(`❌ ${role} Negotiation error:`, err);
+                    makingOffer = false;
+                }
+            };
+        }
+
+        async function initializeMedia() {
+            const role = isInitiator ? '[CALLER]' : '[RECEIVER]';
+            try {
+                console.log(`🎥 ${role} Requesting media access...`);
+                
+                // Request high-quality video
+                const constraints = {
+                    video: {
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 },
+                        facingMode: 'user'
+                    },
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
+                    }
+                };
+                
+                localStream = await navigator.mediaDevices.getUserMedia(constraints);
+                
+                console.log(`✅ ${role} Media obtained: ${localStream.getTracks().length} tracks`);
+                localStream.getTracks().forEach(track => {
+                    console.log(`🎥 ${role} ${track.kind}: ${track.label}`);
+                });
+                
+                // Set local video
+                const localVideo = document.getElementById('localVideo');
+                localVideo.srcObject = localStream;
+                localVideo.muted = true; // Always mute local audio feedback
+                
+                // Create peer connection
+                await createPeerConnection();
+
+                // Initiator creates and sends offer
+                if (isInitiator) {
+                    console.log(`📤 ${role} Waiting for receiver to join room...`);
+                    // Wait a bit for receiver to join the socket room
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    
+                    console.log(`📤 ${role} Creating offer...`);
+                    makingOffer = true;
+                    
+                    const offer = await peerConnection.createOffer({
+                        offerToReceiveAudio: true,
+                        offerToReceiveVideo: true
+                    });
+                    
+                    await peerConnection.setLocalDescription(offer);
+                    console.log(`📤 ${role} Sending offer to room ${currentConversationId}`);
+                    
+                    socket.emit('signalingMessage', {
+                        conversationId: currentConversationId,
+                        message: { 
+                            type: 'offer', 
+                            offer: peerConnection.localDescription 
+                        }
+                    });
+                    console.log(`✅ ${role} Offer sent!`);
+                    
+                    makingOffer = false;
+                }
+
+                inCall = true;
+                console.log(`✅ ${role} Media initialization complete`);
+                
+            } catch (error) {
+                console.error(`❌ ${role} Media error:`, error);
+                
+                let errorMsg = 'Failed to access camera/microphone. ';
+                if (error.name === 'NotAllowedError') {
+                    errorMsg += 'Please grant camera and microphone permissions.';
+                } else if (error.name === 'NotFoundError') {
+                    errorMsg += 'No camera or microphone found.';
+                } else {
+                    errorMsg += error.message;
+                }
+                
+                alert(errorMsg);
+                throw error;
+            }
+        }
+
+        function endCall() {
+            const role = isInitiator ? '[CALLER]' : '[RECEIVER]';
+            console.log(`📴 ${role} Ending call (state: ${callState})...`);
+            
+            callState = 'ending';
+            
+            // Notify other user
+            if (currentConversationId && inCall) {
+                socket.emit('endCall', { conversationId: currentConversationId });
+                console.log(`📴 ${role} Sent endCall notification`);
+            }
+            
+            // Stop and clean up local stream
+            if (localStream) {
+                console.log(`📴 ${role} Stopping local tracks`);
+                localStream.getTracks().forEach(track => {
+                    track.stop();
+                    console.log(`📴 ${role} Stopped ${track.kind} track`);
+                });
+                localStream = null;
+            }
+            
+            // Close peer connection
+            if (peerConnection) {
+                console.log(`📴 ${role} Closing peer connection`);
+                peerConnection.ontrack = null;
+                peerConnection.onicecandidate = null;
+                peerConnection.onconnectionstatechange = null;
+                peerConnection.oniceconnectionstatechange = null;
+                peerConnection.onnegotiationneeded = null;
+                peerConnection.close();
+                peerConnection = null;
+            }
+            
+            // Clean up remote stream
+            if (remoteStream) {
+                remoteStream.getTracks().forEach(track => track.stop());
+                remoteStream = null;
+            }
+            
+            // Clear video elements
+            const localVideo = document.getElementById('localVideo');
+            const remoteVideo = document.getElementById('remoteVideo');
+            localVideo.srcObject = null;
+            remoteVideo.srcObject = null;
+            
+            // Reset state
+            inCall = false;
+            isInitiator = false;
+            callState = 'idle';
+            pendingOffer = null;
+            pendingCandidates = [];
+            iceGatheringComplete = false;
+            makingOffer = false;
+            ignoreOffer = false;
+            isSettingRemoteDescription = false;
+            
+            // Hide video modal
+            document.getElementById('videoModal').classList.remove('active');
+            document.getElementById('callingOverlay').classList.add('hidden');
+            document.getElementById('incomingCallOverlay').classList.add('hidden');
+            
+            console.log(`✅ ${role} Call ended and cleaned up`);
+        }
+
+        // Mute/Unmute
+        document.getElementById('muteBtn').addEventListener('click', () => {
+            if (localStream) {
+                const audioTrack = localStream.getAudioTracks()[0];
+                if (audioTrack) {
+                    audioTrack.enabled = !audioTrack.enabled;
+                    document.getElementById('muteBtn').classList.toggle('bg-red-600');
+                }
+            }
+        });
+
+        // Toggle Video
+        document.getElementById('videoToggleBtn').addEventListener('click', () => {
+            if (localStream) {
+                const videoTrack = localStream.getVideoTracks()[0];
+                if (videoTrack) {
+                    videoTrack.enabled = !videoTrack.enabled;
+                    document.getElementById('videoToggleBtn').classList.toggle('bg-red-600');
+                }
+            }
+        });
+
+        // Socket events for video calls
+        socket.on('incomingCall', (data) => {
+            console.log('📞 [RECEIVER] ===== INCOMING CALL =====');
+            console.log('📞 [RECEIVER] Caller:', data.callerName);
+            console.log('📞 [RECEIVER] Conversation ID:', data.conversationId);
+            console.log('📞 [RECEIVER] Socket room joined');
+            
+            currentConversationId = data.conversationId;
+            currentOtherUserId = data.callerId;
+            currentOtherUserName = data.callerName;
+            
+            isInitiator = false;
+            callState = 'ringing';
+            pendingOffer = null; // Reset
+            pendingCandidates = []; // Reset
+            
+            document.getElementById('videoModal').classList.add('active');
+            document.getElementById('incomingCallOverlay').classList.remove('hidden');
+            document.getElementById('incomingCallerName').textContent = data.callerName;
+            document.getElementById('incomingCallerAvatar').textContent = data.callerName.charAt(0).toUpperCase();
+            
+            console.log('📞 [RECEIVER] Incoming call UI displayed');
+            console.log('📞 [RECEIVER] Waiting for offer and user to accept...');
+            console.log('📞 [RECEIVER] pendingOffer:', pendingOffer);
+        });
+
+        socket.on('callAccepted', () => {
+            console.log('✅ [CALLER] Call accepted by receiver, hiding calling overlay');
+            document.getElementById('callingOverlay').classList.add('hidden');
+        });
+
+        socket.on('callRejected', () => {
+            console.log('❌ [CALLER] Call rejected by receiver');
+            alert('Call was rejected');
+            endCall();
+        });
+
+        socket.on('signalingMessage', async (message) => {
+            const role = isInitiator ? '[CALLER]' : '[RECEIVER]';
+            console.log(`📨 ${role} ========== SIGNALING MESSAGE ==========`);
+            console.log(`📨 ${role} Type:`, message.type);
+            console.log(`📨 ${role} State: inCall=${inCall}, peerConnection=${!!peerConnection}, callState=${callState}`);
+            console.log(`📨 ${role} isInitiator:`, isInitiator);
+            console.log(`📨 ${role} Current pendingOffer:`, !!pendingOffer);
+            
+            try {
+                if (message.type === 'offer') {
+                    console.log(`📨 ${role} ===== OFFER RECEIVED =====`);
+                    console.log(`📨 ${role} Offer SDP length:`, message.offer?.sdp?.length || 0);
+                    
+                    // Always store offer if we're the receiver and haven't processed it yet
+                    if (!isInitiator) {
+                        console.log(`📨 ${role} Storing offer (callState: ${callState})`);
+                        pendingOffer = message.offer;
+                        console.log(`📨 ${role} ✅ Offer stored! pendingOffer is now:`, !!pendingOffer);
+                        
+                        // If user hasn't accepted yet, just store and wait
+                        if (callState === 'ringing' && !peerConnection) {
+                            console.log(`📨 ${role} ✅ Offer stored, waiting for user to accept call`);
+                            return;
+                        }
+                    }
+                    
+                    console.log(`📨 ${role} User has accepted, processing offer immediately`);
+                    
+                    if (!peerConnection) {
+                        console.error(`❌ ${role} No peer connection exists!`);
+                        return;
+                    }
+                    
+                    // Perfect negotiation pattern
+                    const offerCollision = (message.type === 'offer') && (makingOffer || peerConnection.signalingState !== 'stable');
+                    
+                    ignoreOffer = !isInitiator && offerCollision;
+                    if (ignoreOffer) {
+                        console.log(`⚠️ ${role} Ignoring offer due to collision`);
+                        return;
+                    }
+                    
+                    isSettingRemoteDescription = true;
+                    await peerConnection.setRemoteDescription(new RTCSessionDescription(message.offer));
+                    isSettingRemoteDescription = false;
+                    console.log(`✅ ${role} Remote description set from offer`);
+                    
+                    const answer = await peerConnection.createAnswer();
+                    await peerConnection.setLocalDescription(answer);
+                    
+                    socket.emit('signalingMessage', {
+                        conversationId: currentConversationId,
+                        message: { type: 'answer', answer: answer }
+                    });
+                    console.log(`📤 ${role} Answer sent`);
+                    
+                } else if (message.type === 'answer') {
+                    console.log(`📨 ${role} Received answer from RECEIVER`);
+                    console.log(`📨 ${role} Peer connection signaling state: ${peerConnection ? peerConnection.signalingState : 'NULL'}`);
+                    
+                    if (!peerConnection) {
+                        console.error(`❌ ${role} No peer connection when answer arrived!`);
+                        return;
+                    }
+                    
+                    if (peerConnection.signalingState === 'have-local-offer') {
+                        console.log(`📨 ${role} Setting remote description from answer...`);
+                        isSettingRemoteDescription = true;
+                        await peerConnection.setRemoteDescription(new RTCSessionDescription(message.answer));
+                        isSettingRemoteDescription = false;
+                        console.log(`✅ ${role} Remote description set! New state: ${peerConnection.signalingState}`);
+                        
+                        // Process queued candidates
+                        console.log(`🧊 ${role} Processing ${pendingCandidates.length} queued candidates...`);
+                        for (const candidate of pendingCandidates) {
+                            try {
+                                await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+                                console.log(`✅ ${role} Added queued candidate`);
+                            } catch (err) {
+                                if (err.name !== 'OperationError') {
+                                    console.warn(`⚠️ ${role} Candidate error:`, err.message);
+                                }
+                            }
+                        }
+                        pendingCandidates = [];
+                        console.log(`✅ ${role} All queued candidates processed`);
+                    } else {
+                        console.warn(`⚠️ ${role} Unexpected signaling state for answer: ${peerConnection.signalingState}`);
+                    }
+                    
+                } else if (message.type === 'candidate') {
+                    console.log(`🧊 ${role} Received ICE candidate`);
+                    
+                    // Always queue candidates for receiver until offer is processed
+                    if (!isInitiator && !peerConnection) {
+                        console.log(`🧊 ${role} Queuing candidate (no peer connection yet)`);
+                        pendingCandidates.push(message.candidate);
+                        return;
+                    }
+                    
+                    try {
+                        if (peerConnection && peerConnection.remoteDescription && !isSettingRemoteDescription) {
+                            await peerConnection.addIceCandidate(new RTCIceCandidate(message.candidate));
+                            console.log(`✅ ${role} ICE candidate added immediately`);
+                        } else {
+                            console.log(`🧊 ${role} Queuing candidate (remote desc not ready)`);
+                            pendingCandidates.push(message.candidate);
+                        }
+                    } catch (err) {
+                        if (err.name !== 'OperationError') {
+                            console.warn(`⚠️ ${role} Candidate error:`, err.message);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error(`❌ ${role} Signaling error:`, error);
+            }
+        });
+
+        socket.on('userOnline', (onlineUserId) => {
+            if (onlineUserId === currentOtherUserId) {
+                document.getElementById('chatStatus').textContent = 'Online';
+                document.getElementById('chatStatus').classList.add('text-green-500');
+            }
+        });
+
+        socket.on('userOffline', (offlineUserId) => {
+            if (offlineUserId === currentOtherUserId) {
+                document.getElementById('chatStatus').textContent = 'Offline';
+                document.getElementById('chatStatus').classList.remove('text-green-500');
+            }
+        });
+
+        // Handle when other user ends the call
+        socket.on('callEnded', () => {
+            console.log('Other user ended the call');
+            
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+                localStream = null;
+            }
+            
+            if (peerConnection) {
+                peerConnection.close();
+                peerConnection = null;
+            }
+            
+            if (remoteStream) {
+                remoteStream.getTracks().forEach(track => track.stop());
+                remoteStream = null;
+            }
+            
+            // Clear video sources
+            document.getElementById('localVideo').srcObject = null;
+            document.getElementById('remoteVideo').srcObject = null;
+            
+            inCall = false;
+            isInitiator = false;
+            
+            document.getElementById('videoModal').classList.remove('active');
+            document.getElementById('callingOverlay').classList.add('hidden');
+            document.getElementById('incomingCallOverlay').classList.add('hidden');
+            
+            alert('Call ended by the other user');
+        });
+    </script>
+</body>
+</html>
